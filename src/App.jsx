@@ -115,10 +115,6 @@ export default function App() {
               </div>
             ) : (
               <>
-                <div
-                  className="shake-icon"
-                  style={{ transform: `scale(${1 + intensity * 0.003})` }}
-                >📱</div>
                 <span className="ring-pct" style={{ color }}>{intensity}%</span>
                 <span className="ring-hint">{hint(intensity)}</span>
               </>
