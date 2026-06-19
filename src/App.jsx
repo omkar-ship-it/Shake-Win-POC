@@ -40,20 +40,20 @@ function SimulateButton({ onTick }) {
   );
 }
 
-// Bar color: grey → amber → green
-function barColor(pct) {
+const RADIUS = 100;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS; // ≈ 628.3
+
+function ringColor(pct) {
   if (pct < 50) return '#6b7280';
   if (pct < 80) return '#f59e0b';
   return '#6bc670';
 }
 
-// Contextual hint based on intensity
-function hint(pct, phase) {
-  if (phase === 'revealed') return '';
-  if (pct === 0)   return 'Shake your phone to fill the bar!';
-  if (pct < 40)   return 'Keep going…';
-  if (pct < 70)   return 'Shake harder! 💪';
-  if (pct < 100)  return 'Almost there! 🔥';
+function hint(pct) {
+  if (pct === 0)  return 'Shake your phone!';
+  if (pct < 40)  return 'Keep going…';
+  if (pct < 70)  return 'Shake harder! 💪';
+  if (pct < 100) return 'Almost there! 🔥';
   return 'Hold it! ⚡';
 }
 
@@ -76,8 +76,9 @@ export default function App() {
     setReward(null);
   }
 
-  const color = barColor(intensity);
+  const color = ringColor(intensity);
   const isAtMax = intensity >= 100;
+  const offset = CIRCUMFERENCE * (1 - intensity / 100);
 
   return (
     <div className="app">
@@ -88,36 +89,42 @@ export default function App() {
 
       <main className="stage">
 
-        {/* Phone graphic */}
-        <div className={`phone ${isAtMax && phase === 'idle' ? 'phone--maxed' : ''}`}>
-          {phase === 'revealed' ? (
-            <div className="phone__reward">
-              <div className="reward-emoji">🎊</div>
-              <p className="reward-text">{reward}</p>
-            </div>
-          ) : (
-            <div className="phone__idle">
-              <div className="shake-icon" style={{ transform: `scale(${1 + intensity * 0.004})` }}>📱</div>
-              <p className="idle-label">Shake me!</p>
-            </div>
-          )}
-        </div>
+        {/* Circular progress ring */}
+        <div className={`ring-wrap ${isAtMax && phase === 'idle' ? 'ring-wrap--maxed' : ''}`}>
+          <svg className="ring-svg" viewBox="0 0 240 240" width="240" height="240">
+            {/* Track */}
+            <circle className="ring-track" cx="120" cy="120" r={RADIUS} />
+            {/* Fill */}
+            <circle
+              className="ring-fill"
+              cx="120" cy="120" r={RADIUS}
+              style={{
+                stroke: color,
+                strokeDasharray: CIRCUMFERENCE,
+                strokeDashoffset: offset,
+              }}
+            />
+          </svg>
 
-        {/* Progress bar */}
-        {phase !== 'revealed' && (
-          <div className="meter">
-            <div className="meter__track">
-              <div
-                className={`meter__fill ${isAtMax ? 'meter__fill--pulse' : ''}`}
-                style={{ width: `${intensity}%`, background: color }}
-              />
-            </div>
-            <div className="meter__labels">
-              <span className="meter__pct" style={{ color }}>{intensity}%</span>
-              <span className="meter__hint">{hint(intensity, phase)}</span>
-            </div>
+          {/* Content inside the ring */}
+          <div className="ring-center">
+            {phase === 'revealed' ? (
+              <div className="ring-reward">
+                <span className="reward-emoji">🎊</span>
+                <p className="reward-text">{reward}</p>
+              </div>
+            ) : (
+              <>
+                <div
+                  className="shake-icon"
+                  style={{ transform: `scale(${1 + intensity * 0.003})` }}
+                >📱</div>
+                <span className="ring-pct" style={{ color }}>{intensity}%</span>
+                <span className="ring-hint">{hint(intensity)}</span>
+              </>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Status */}
         <div className="instructions">
