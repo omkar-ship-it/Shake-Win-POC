@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import confetti from 'canvas-confetti';
 import { useShake } from './useShake';
 import './App.css';
+
+function fireConfetti() {
+  confetti({
+    particleCount: 120,
+    spread: 80,
+    origin: { y: 0.5 },
+    colors: ['#6bc670', '#ffffff', '#f59e0b', '#f87171', '#60a5fa'],
+  });
+}
 
 const REWARDS = [
   '🎉 ₹50 off your next visit',
@@ -66,6 +76,7 @@ export default function App() {
     setShakeCount(c => c + 1);
     setReward(pickReward());
     setPhase('revealed');
+    fireConfetti();
   }, []);
 
   const { permissionState, requestPermission, intensity, simulateShake, resetIntensity } = useShake(handleShake);
