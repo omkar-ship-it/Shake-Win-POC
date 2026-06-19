@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShake } from './useShake';
 import './App.css';
 
@@ -13,6 +13,31 @@ const REWARDS = [
 
 function pickReward() {
   return REWARDS[Math.floor(Math.random() * REWARDS.length)];
+}
+
+// Fires onTick every 16ms while the button is held, simulating continuous motion events
+function SimulateButton({ onTick }) {
+  const intervalRef = useRef(null);
+
+  function start() {
+    onTick();
+    intervalRef.current = setInterval(onTick, 16);
+  }
+  function stop() {
+    clearInterval(intervalRef.current);
+  }
+  useEffect(() => () => clearInterval(intervalRef.current), []);
+
+  return (
+    <button
+      className="btn btn--ghost"
+      onPointerDown={start}
+      onPointerUp={stop}
+      onPointerLeave={stop}
+    >
+      Hold to Simulate Shake
+    </button>
+  );
 }
 
 // Bar color: grey → amber → green
@@ -123,12 +148,7 @@ export default function App() {
               Enable Shake Detection
             </button>
           ) : (permissionState === 'unsupported' || permissionState === 'granted') && (
-            <button
-              className="btn btn--ghost"
-              onPointerDown={simulateShake}
-            >
-              Hold to Simulate Shake
-            </button>
+            <SimulateButton onTick={simulateShake} />
           )}
         </div>
 

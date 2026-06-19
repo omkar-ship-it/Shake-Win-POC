@@ -1,52 +1,43 @@
 import { useEffect, useRef, useState } from 'react';
 
-// Acceleration delta needed to hit 100% intensity
-const MAX_DELTA = 28;
-// How fast intensity decays per animation frame (~60fps → ~0.7% per frame = empty in ~1.4s)
-const DECAY_PER_FRAME = 1.8;
-// How long intensity must stay at 100% before reward fires (ms)
-const HOLD_MS = 300;
+// Minimum acceleration delta to count as "shaking" (low so any shake registers)
+const MIN_DELTA = 5;
+// Charge added per ~16ms frame while shaking — 2.4% → full in ~2.5s
+const CHARGE_PER_FRAME = 2.4;
+// Charge lost per frame while still — drains in ~1.5s
+const DECAY_PER_FRAME = 3.0;
 
 export function useShake(onShake) {
   const [permissionState, setPermissionState] = useState('unknown');
   const [intensity, setIntensity] = useState(0); // 0–100, shown in the progress bar
 
   const lastAccel = useRef({ x: 0, y: 0, z: 0 });
-  const intensityRef = useRef(0);       // live value updated by motion events
-  const lastMotionAt = useRef(0);       // timestamp of last motion event
-  const fullSince = useRef(null);       // when intensity first hit 100
+  const chargeRef = useRef(0);          // 0-100: accumulated shake time
+  const isShakingRef = useRef(false);   // true when a motion event fired recently
+  const lastMotionAt = useRef(0);
   const rafId = useRef(null);
-  const firedRef = useRef(false);       // prevent double-firing during cooldown
+  const firedRef = useRef(false);
 
-  // rAF loop: decay intensity and watch for the hold-at-100 trigger
+  // rAF loop: charge while shaking, decay while still, fire at 100
   useEffect(() => {
     if (permissionState !== 'granted') return;
 
     function tick() {
-      const now = Date.now();
-      const timeSinceMotion = now - lastMotionAt.current;
+      const timeSinceMotion = Date.now() - lastMotionAt.current;
+      isShakingRef.current = timeSinceMotion < 80;
 
-      // Decay if no recent motion event
-      if (timeSinceMotion > 80) {
-        intensityRef.current = Math.max(0, intensityRef.current - DECAY_PER_FRAME);
+      if (isShakingRef.current) {
+        chargeRef.current = Math.min(100, chargeRef.current + CHARGE_PER_FRAME);
+      } else {
+        chargeRef.current = Math.max(0, chargeRef.current - DECAY_PER_FRAME);
       }
 
-      const val = intensityRef.current;
-      setIntensity(Math.round(val));
+      setIntensity(Math.round(chargeRef.current));
 
-      // Track how long we've been at 100%
-      if (val >= 100) {
-        if (fullSince.current === null) fullSince.current = now;
-
-        if (!firedRef.current && now - fullSince.current >= HOLD_MS) {
-          firedRef.current = true;
-          // Haptic feedback
-          if (navigator.vibrate) navigator.vibrate([80, 40, 120]);
-          onShake();
-        }
-      } else {
-        fullSince.current = null;
-        firedRef.current = false;
+      if (!firedRef.current && chargeRef.current >= 100) {
+        firedRef.current = true;
+        if (navigator.vibrate) navigator.vibrate([80, 40, 120]);
+        onShake();
       }
 
       rafId.current = requestAnimationFrame(tick);
@@ -56,7 +47,7 @@ export function useShake(onShake) {
     return () => cancelAnimationFrame(rafId.current);
   }, [permissionState, onShake]);
 
-  // Motion event listener — sets raw intensity from acceleration delta
+  // Motion event listener — marks device as actively shaking
   useEffect(() => {
     if (permissionState !== 'granted') return;
 
@@ -74,33 +65,24 @@ export function useShake(onShake) {
       );
 
       lastAccel.current = { x, y, z };
-      lastMotionAt.current = Date.now();
 
-      // Push intensity up — clamp at 100, don't let it fall from motion events
-      const next = Math.min(100, Math.max(intensityRef.current, (delta / MAX_DELTA) * 100));
-      intensityRef.current = next;
+      if (delta > MIN_DELTA) {
+        lastMotionAt.current = Date.now();
+      }
     }
 
     window.addEventListener('devicemotion', handleMotion);
     return () => window.removeEventListener('devicemotion', handleMotion);
   }, [permissionState]);
 
-  // Simulate a shake for desktop testing
+  // Simulate sustained shaking for desktop — keeps lastMotionAt fresh while held
   function simulateShake() {
     if (firedRef.current) return;
-    let progress = intensityRef.current;
-    const interval = setInterval(() => {
-      progress = Math.min(100, progress + 12);
-      intensityRef.current = progress;
-      lastMotionAt.current = Date.now();
-      if (progress >= 100) clearInterval(interval);
-    }, 30);
+    lastMotionAt.current = Date.now();
   }
 
-  // Reset intensity after reward is revealed
   function resetIntensity() {
-    intensityRef.current = 0;
-    fullSince.current = null;
+    chargeRef.current = 0;
     firedRef.current = false;
     setIntensity(0);
   }
