@@ -181,9 +181,3 @@ body {
   letter-spacing: 0.05em;
 }
 
-.debug {
-  padding: 0.75rem 1.5rem;
-  border-top: 1px solid rgba(255,255,255,0.06);
-  font-size: 0.7rem;
-  color: rgba(107,114,128,1);
-}

@@ -160,9 +160,6 @@ export default function App() {
         )}
       </main>
 
-      <footer className="debug">
-        <code>permissionState: {permissionState} · intensity: {intensity}</code>
-      </footer>
     </div>
   );
 }
