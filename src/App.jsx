@@ -15,35 +15,44 @@ function pickReward() {
   return REWARDS[Math.floor(Math.random() * REWARDS.length)];
 }
 
+// Bar color: grey → amber → green
+function barColor(pct) {
+  if (pct < 50) return '#6b7280';
+  if (pct < 80) return '#f59e0b';
+  return '#6bc670';
+}
+
+// Contextual hint based on intensity
+function hint(pct, phase) {
+  if (phase === 'revealed') return '';
+  if (pct === 0)   return 'Shake your phone to fill the bar!';
+  if (pct < 40)   return 'Keep going…';
+  if (pct < 70)   return 'Shake harder! 💪';
+  if (pct < 100)  return 'Almost there! 🔥';
+  return 'Hold it! ⚡';
+}
+
 export default function App() {
-  const [phase, setPhase] = useState('idle'); // idle | shaking | revealed
+  const [phase, setPhase] = useState('idle'); // idle | revealed
   const [reward, setReward] = useState(null);
   const [shakeCount, setShakeCount] = useState(0);
 
   const handleShake = useCallback(() => {
     setShakeCount(c => c + 1);
-    setPhase('shaking');
-
-    setTimeout(() => {
-      setReward(pickReward());
-      setPhase('revealed');
-    }, 600);
+    setReward(pickReward());
+    setPhase('revealed');
   }, []);
 
-  const { permissionState, requestPermission } = useShake(handleShake);
+  const { permissionState, requestPermission, intensity, simulateShake, resetIntensity } = useShake(handleShake);
 
   function reset() {
+    resetIntensity();
     setPhase('idle');
     setReward(null);
   }
 
-  function handleTriggerButton() {
-    if (permissionState === 'needs-prompt') {
-      requestPermission();
-      return;
-    }
-    handleShake();
-  }
+  const color = barColor(intensity);
+  const isAtMax = intensity >= 100;
 
   return (
     <div className="app">
@@ -53,7 +62,9 @@ export default function App() {
       </header>
 
       <main className="stage">
-        <div className={`phone ${phase === 'shaking' ? 'phone--shaking' : ''}`}>
+
+        {/* Phone graphic */}
+        <div className={`phone ${isAtMax && phase === 'idle' ? 'phone--maxed' : ''}`}>
           {phase === 'revealed' ? (
             <div className="phone__reward">
               <div className="reward-emoji">🎊</div>
@@ -61,58 +72,73 @@ export default function App() {
             </div>
           ) : (
             <div className="phone__idle">
-              <div className="shake-icon">📱</div>
-              <p>{phase === 'shaking' ? 'Shaking…' : 'Shake me!'}</p>
+              <div className="shake-icon" style={{ transform: `scale(${1 + intensity * 0.004})` }}>📱</div>
+              <p className="idle-label">Shake me!</p>
             </div>
           )}
         </div>
 
+        {/* Progress bar */}
+        {phase !== 'revealed' && (
+          <div className="meter">
+            <div className="meter__track">
+              <div
+                className={`meter__fill ${isAtMax ? 'meter__fill--pulse' : ''}`}
+                style={{ width: `${intensity}%`, background: color }}
+              />
+            </div>
+            <div className="meter__labels">
+              <span className="meter__pct" style={{ color }}>{intensity}%</span>
+              <span className="meter__hint">{hint(intensity, phase)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Status */}
         <div className="instructions">
           {permissionState === 'unsupported' && (
             <p className="status status--warn">
-              Motion not supported on this device.<br />Use the button below to simulate.
+              Motion API not available — use the button to simulate.
             </p>
           )}
           {permissionState === 'denied' && (
             <p className="status status--error">
-              Motion access denied. Enable it in Settings → Safari → Motion &amp; Orientation.
+              Motion access denied.<br />
+              Settings → Safari → Motion &amp; Orientation Access.
             </p>
           )}
-          {permissionState === 'granted' && phase === 'idle' && (
-            <p className="status">Shake your phone to reveal a reward!</p>
-          )}
           {permissionState === 'needs-prompt' && (
-            <p className="status">Tap the button to enable shake detection.</p>
+            <p className="status">Tap below to enable shake detection.</p>
           )}
         </div>
 
+        {/* Actions */}
         <div className="actions">
           {phase === 'revealed' ? (
             <button className="btn btn--secondary" onClick={reset}>
               Shake Again
             </button>
-          ) : (
+          ) : permissionState === 'needs-prompt' ? (
+            <button className="btn btn--primary" onClick={requestPermission}>
+              Enable Shake Detection
+            </button>
+          ) : (permissionState === 'unsupported' || permissionState === 'granted') && (
             <button
-              className="btn btn--primary"
-              onClick={handleTriggerButton}
-              disabled={phase === 'shaking'}
+              className="btn btn--ghost"
+              onPointerDown={simulateShake}
             >
-              {permissionState === 'needs-prompt'
-                ? 'Enable Shake Detection'
-                : phase === 'shaking'
-                ? 'Shaking…'
-                : 'Tap to Shake (Desktop)'}
+              Hold to Simulate Shake
             </button>
           )}
         </div>
 
-        {shakeCount > 0 && (
-          <p className="shake-count">Shakes detected: {shakeCount}</p>
+        {shakeCount > 0 && phase !== 'revealed' && (
+          <p className="shake-count">Rewards won: {shakeCount}</p>
         )}
       </main>
 
       <footer className="debug">
-        <code>permissionState: {permissionState}</code>
+        <code>permissionState: {permissionState} · intensity: {intensity}</code>
       </footer>
     </div>
   );
